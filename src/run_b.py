@@ -32,6 +32,13 @@ def main():
 
     print("Done. Check outputs/ for PNG + CSV.")
 
+    # ---- 3D export (OBJ) ----
+    from export_3d import export_obj
+
+    export_obj(out_a["buildings"], "outputs/site_mass_rule_area.obj", show=True)
+    export_obj(out_b["buildings"], "outputs/site_mass_rule_frontage.obj")
+
+
 
 if __name__ == "__main__":
     main()
