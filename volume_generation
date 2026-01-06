@@ -1,0 +1,290 @@
+"""
+volume_generator.py
+===================
+
+This module provides a simple pipeline for generating a three‑dimensional
+`volume` (extruded building mass) from a two‑dimensional land parcel and a
+specified floor area ratio (FAR).  The code follows the workflow outlined in
+the assignment for the Design Computation & Computational Geometry course:
+
+1. **Read parcel geometry** – a Shapely ``Polygon`` representing the land lot
+   is passed into the main function.  In practice this geometry may come from
+   GIS data (e.g. GeoJSON or shapefile) loaded with ``geopandas`` or created
+   manually.
+2. **Setback / buildable area** – an inward buffer (negative distance) is
+   applied to the parcel to model regulatory setbacks.  According to the
+   Shapely manual, positive distances dilate geometries while negative
+   distances erode them【611869279661650†L1504-L1564】.  The resulting polygon
+   becomes the buildable footprint.
+3. **Height and volume allocation** – the floor area ratio is defined as the
+   ratio of total building floor area to plot area【581125031250967†L137-L147】.  The
+   total allowable floor area is ``FAR × original_area``.  By dividing this
+   value by the buildable footprint area we obtain the number of floors (floors
+   are truncated to an integer).  The final building height is then
+   ``floor_count × floor_height``, where ``floor_height`` is a design parameter
+   (defaulting to 3.0 metres).
+4. **2.5D volume generation** – the buildable footprint is extruded into a
+   polyhedral mesh.  Each side and the top/bottom faces of the prism are
+   collected into a list of faces which can be visualized with
+   ``mpl_toolkits.mplot3d.art3d.Poly3DCollection``.
+5. **Visualisation** – a helper function uses Matplotlib to render the
+   extruded volume in a 3D axes.  The colour of the mesh is keyed off its
+   height to communicate relative building height.  Other visualisation
+   techniques (such as oblique projections or coloured height maps) could
+   easily be implemented based on this data structure.
+
+The example block in ``__main__`` demonstrates how to generate and plot a
+volume for a rectangular parcel with a setback and FAR.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from typing import Iterable, List, Tuple
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from shapely.geometry import Polygon
+
+
+@dataclass
+class VolumeResult:
+    """Encapsulates the result of the volume computation.
+
+    Attributes
+    ----------
+    buildable_polygon: Polygon
+        The footprint polygon after applying the setback.  This is the shape
+        that will be extruded.
+    height: float
+        The resulting building height in the same units as the input geometry.
+    floor_count: int
+        The number of floors determined from the FAR.
+    buildable_area: float
+        The area of the buildable footprint.
+    """
+
+    buildable_polygon: Polygon
+    height: float
+    floor_count: int
+    buildable_area: float
+
+
+def compute_buildable_volume(
+    polygon: Polygon,
+    far: float,
+    *,
+    setback: float = 0.0,
+    floor_height: float = 3.0,
+    min_floors: int = 1,
+) -> VolumeResult:
+    """Compute the buildable footprint, floor count and height for a parcel.
+
+    Parameters
+    ----------
+    polygon : Polygon
+        The original land parcel.  Units are arbitrary but must be consistent
+        across area and height.
+    far : float
+        Floor area ratio.  ``far = gross_floor_area / area_of_plot``【581125031250967†L137-L147】.
+    setback : float, optional
+        The setback distance applied uniformly on all sides.  A negative
+        distance erodes the polygon (shrinks it), whereas a positive distance
+        dilates it.  This uses Shapely's buffer operation【611869279661650†L1504-L1564】.
+    floor_height : float, optional
+        Height of a single floor.  Defaults to 3.0 metres.
+    min_floors : int, optional
+        Minimum number of floors; if the FAR would result in fewer floors
+        than this value, the floor count is clamped up.  Defaults to 1.
+
+    Returns
+    -------
+    VolumeResult
+        A dataclass containing the buildable polygon, the resulting
+        building height, the number of floors, and the buildable area.
+
+    Raises
+    ------
+    ValueError
+        If the setback erodes the parcel completely.
+    """
+    if far <= 0:
+        raise ValueError("FAR must be positive")
+
+    # Calculate the buildable footprint by applying an inward buffer (setback)
+    if setback != 0:
+        buildable_polygon = polygon.buffer(-setback)
+    else:
+        buildable_polygon = polygon
+
+    if buildable_polygon.is_empty:
+        raise ValueError(
+            "Setback distance is too large; the buildable polygon is empty."
+        )
+
+    # Compute areas
+    plot_area = polygon.area
+    buildable_area = buildable_polygon.area
+
+    # Total allowable gross floor area given FAR
+    total_floor_area = plot_area * far
+
+    # Derive number of floors by dividing by buildable area
+    floor_count = max(int(total_floor_area // buildable_area), min_floors)
+
+    # Height is the number of floors times the floor height
+    height = floor_count * floor_height
+
+    return VolumeResult(
+        buildable_polygon=buildable_polygon,
+        height=height,
+        floor_count=floor_count,
+        buildable_area=buildable_area,
+    )
+
+
+def extrude_polygon(
+    polygon: Polygon, height: float
+) -> List[List[Tuple[float, float, float]]]:
+    """Extrude a 2D polygon into a set of 3D faces.
+
+    The returned list of faces is compatible with Matplotlib's
+    ``Poly3DCollection``.  Each face is a list of (x, y, z) tuples.
+
+    Parameters
+    ----------
+    polygon : Polygon
+        Footprint to extrude.
+    height : float
+        Height of extrusion.
+
+    Returns
+    -------
+    list of list of tuple
+        A list of faces (each face itself being a list of 3D vertices).
+    """
+    # Extract exterior coordinates (excluding the duplicate closing point)
+    x_coords, y_coords = polygon.exterior.coords.xy
+    coords = list(zip(x_coords, y_coords))[:-1]
+    # Bottom and top rings
+    bottom = [(x, y, 0.0) for x, y in coords]
+    top = [(x, y, height) for x, y in coords]
+
+    faces: List[List[Tuple[float, float, float]]] = []
+    # Bottom face (original orientation)
+    faces.append(bottom)
+    # Top face (reverse orientation to ensure correct normal direction)
+    faces.append(top[::-1])
+    # Side faces
+    n = len(coords)
+    for i in range(n):
+        j = (i + 1) % n
+        face = [
+            bottom[i],  # current bottom vertex
+            bottom[j],  # next bottom vertex
+            top[j],     # next top vertex
+            top[i],     # current top vertex
+        ]
+        faces.append(face)
+    return faces
+
+
+def plot_volume(
+    faces: Iterable[Iterable[Tuple[float, float, float]]],
+    height: float,
+    *,
+    ax: plt.Axes | None = None,
+    cmap: plt.Colormap | None = None,
+) -> plt.Axes:
+    """Plot the extruded volume using Matplotlib.
+
+    Parameters
+    ----------
+    faces : iterable
+        Collection of faces returned by :func:`extrude_polygon`.
+    height : float
+        Height of the volume; used to scale the colour map.
+    ax : Axes, optional
+        An existing 3D axes to draw on.  If ``None``, a new figure and axes
+        will be created.
+    cmap : Colormap, optional
+        Colormap used to colour the volume.  Defaults to ``plt.cm.viridis``.
+
+    Returns
+    -------
+    Axes
+        The 3D axes containing the plotted volume.
+    """
+    if cmap is None:
+        cmap = plt.cm.viridis
+
+    if ax is None:
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection="3d")
+    else:
+        fig = ax.get_figure()
+
+    # Colour scaled based on height (normalised to an arbitrary range)
+    colour = cmap(min(height / 50.0, 1.0))
+
+    poly3d = Poly3DCollection(faces, facecolors=colour, edgecolor="k", alpha=0.8)
+    ax.add_collection3d(poly3d)
+
+    # Determine plot bounds
+    xs = []
+    ys = []
+    zs = []
+    for face in faces:
+        for (x, y, z) in face:
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
+
+    ax.set_xlim(min(xs) - 1.0, max(xs) + 1.0)
+    ax.set_ylim(min(ys) - 1.0, max(ys) + 1.0)
+    ax.set_zlim(0.0, max(zs) + 1.0)
+
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_title(f"Extruded volume (height={height:.2f})")
+
+    # Improve aspect ratio
+    ax.set_box_aspect([
+        (max(xs) - min(xs)),
+        (max(ys) - min(ys)),
+        max(zs) - 0.0,
+    ])
+
+    return ax
+
+
+if __name__ == "__main__":
+    # Demonstration using a rectangular parcel
+    from shapely.geometry import box
+
+    # Define a 50 × 40 plot (units can be metres)
+    parcel = box(0, 0, 50, 40)
+    far_example = 2.5  # floor area ratio
+    setback_example = 5.0  # uniform setback of 5
+    floor_height_example = 3.5  # height per floor
+
+    result = compute_buildable_volume(
+        parcel,
+        far_example,
+        setback=setback_example,
+        floor_height=floor_height_example,
+    )
+
+    print(f"Buildable area: {result.buildable_area:.2f} square units")
+    print(f"Number of floors: {result.floor_count}")
+    print(f"Building height: {result.height:.2f} units")
+
+    # Extrude and plot
+    faces = extrude_polygon(result.buildable_polygon, result.height)
+    ax = plot_volume(faces, result.height)
+    # Save the example figure for reference
+    fig = ax.get_figure()
+    fig.tight_layout()
+    fig.savefig("example_volume.png")
