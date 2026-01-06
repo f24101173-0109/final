@@ -16,7 +16,7 @@ from typing import Iterable, List, Tuple
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiPolygon
 
 
 @dataclass
@@ -66,6 +66,13 @@ def compute_buildable_volume(
 
 def extrude_polygon(polygon: Polygon, height: float) -> List[List[Tuple[float, float, float]]]:
     """Extrude a 2D polygon into 3D faces for Matplotlib Poly3DCollection."""
+    # If setback/buffer splits the footprint, it can become a MultiPolygon.
+    # For quick visualization, keep the largest piece.
+    if isinstance(polygon, MultiPolygon):
+        parts = list(polygon.geoms)
+        parts.sort(key=lambda g: g.area, reverse=True)
+        polygon = parts[0]
+        
     x_coords, y_coords = polygon.exterior.coords.xy
     coords = list(zip(x_coords, y_coords))[:-1]  # drop closing point
 

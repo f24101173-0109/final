@@ -19,13 +19,13 @@ def main():
     parcels = load_parcels_geojson(geojson_path)
 
     # Rule set A
-    out_a = run_batch(parcels, far_rule_area, setback=3.0, floor_height=3.6)
+    out_a = run_batch(parcels, far_rule_area, setback=0.5, floor_height=3.6)
     save_csv(out_a["rows"], "outputs/result_rule_area.csv")
     buildings_a = [(pid, poly, h) for (pid, poly, h, _faces) in out_a["buildings"]]
     plot_height_map(buildings_a, "outputs/height_map_rule_area.png", "Height map (Rule A: FAR by area)")
 
     # Rule set B
-    out_b = run_batch(parcels, far_rule_frontage, setback=3.0, floor_height=3.6)
+    out_b = run_batch(parcels, far_rule_frontage, setback=0.5, floor_height=3.6)
     save_csv(out_b["rows"], "outputs/result_rule_frontage.csv")
     buildings_b = [(pid, poly, h) for (pid, poly, h, _faces) in out_b["buildings"]]
     plot_height_map(buildings_b, "outputs/height_map_rule_frontage.png", "Height map (Rule B: FAR by frontage/shape)")
