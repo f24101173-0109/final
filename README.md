@@ -73,7 +73,6 @@ src/
 所有成果會輸出到 outputs/ 資料夾。
 
 ●執行成果(部分)
-## Batch Massing with Basemap
 
 <h2>Batch Massing with Basemap</h2>
 <p align="center">
