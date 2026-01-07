@@ -74,7 +74,6 @@ src/
 
 ●執行成果(部分)
 
-<h2>Batch Massing with Basemap</h2>
 <p align="center">
   <img src="outputs/batch_massing_with_basemap.png" width="800">
 </p>
