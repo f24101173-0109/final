@@ -32,12 +32,49 @@ def main():
 
     print("Done. Check outputs/ for PNG + CSV.")
 
+    # ---- 3D batch view (keep ONLY this window) ----
+    from viz3d import plot_site_massing_3d
+
+    # 只跳一張成果圖，先留這個 show=True
+    plot_site_massing_3d(
+        parcels,
+        out_a["buildings"],
+        title="Batch Volume (rule: area)",
+        save_path="outputs/batch_massing_rule_area_3d.png",
+        show=True,          # 只留這個 True
+        unit="m",
+        max_buildings=300,
+    )
+
+    # 其他 3D 圖：只存檔，不跳窗
+    plot_site_massing_3d(
+        parcels,
+        out_b["buildings"],
+        title="Batch Volume (rule: frontage)",
+        save_path="outputs/batch_massing_rule_frontage_3d.png",
+        show=False,
+        unit="m",
+        max_buildings=300,
+    )
+
+    # 這兩段先不要（它們會再開視窗）
+    # from volume_generator import plot_batch_volumes
+    # plot_batch_volumes(out_a["buildings"], title="Batch Volume (rule: area)", show=True, max_buildings=300)
+
     # ---- 3D export (OBJ) ----
     from export_3d import export_obj
+    export_obj(out_a["buildings"], "outputs/site_mass_rule_area.obj", show=False)   # ✅ 不跳 viewer
+    export_obj(out_b["buildings"], "outputs/site_mass_rule_frontage.obj", show=False)
 
-    export_obj(out_a["buildings"], "outputs/site_mass_rule_area.obj", show=True)
-    export_obj(out_b["buildings"], "outputs/site_mass_rule_frontage.obj")
-
+    # 這段也先不要（又會再開一個 3D 視窗）
+    # from volume_generator import plot_batch_volumes
+    # plot_batch_volumes(
+    #     out_a["buildings"],
+    #     base_parcels=parcels,
+    #     title="Batch massing (BCR+FAR from GeoJSON)",
+    #     show=True,
+    #     save_path="outputs/batch_massing_3d.png",
+    # )
 
 
 if __name__ == "__main__":
