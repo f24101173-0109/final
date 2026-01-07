@@ -72,6 +72,14 @@ src/
 
 所有成果會輸出到 outputs/ 資料夾。
 
+●執行成果(部分)
+## Batch Massing with Basemap
+
+<h2>Batch Massing with Basemap</h2>
+<p align="center">
+  <img src="outputs/batch_massing_with_basemap.png" width="800">
+</p>
+
 ●系統功能
 
 1.批次處理、多基地自動生成
