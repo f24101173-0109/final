@@ -1,4 +1,4 @@
-##都市量體生成系統
+都市量體生成系統
 Design Computation & Computational Geometry｜期末專題
 
 本專題以 Python 與 Computational Geometry 建立一套由 GeoJSON 基地資料出發，結合都市計畫規則，自動批次生成 2.5D 建築量體
