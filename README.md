@@ -95,13 +95,13 @@ src/
 
 環境需求
 
-Python 3.11 以上
+    Python 3.11 以上
 
 作業系統：Windows（本專題於 Windows 測試）
 
 安裝套件
 
-pip install -r requirements.txt
+    pip install -r requirements.txt
 
 執行方式：
 
