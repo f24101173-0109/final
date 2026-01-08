@@ -14,7 +14,7 @@ src/
 
 ├─ batch_massing.py    # 核心量體邏輯（建蔽率＋容積率）
 
-├─ volume_generator.py # 量體擠出與 3D 視覺化 (亦文負責此部分)
+├─ volume_generator.py # 量體擠出與 3D 視覺化 
 
 ├─ viz2d.py / viz3d.py # 2D / 3D 視覺化
 
